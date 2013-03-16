@@ -1,0 +1,223 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Line Runner</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<meta name="Keywords" content="">
+<meta name="Description" content="">
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js" type="text/javascript"></script>
+<script src="http://strd6.com/space_demo/javascripts/jquery.hotkeys.js" type="text/javascript"></script>
+<script src="jump.js"></script>
+<script>
+$(function() {
+  window.keydown = {};
+  
+  function keyName(event) {
+    return jQuery.hotkeys.specialKeys[event.which] ||
+      String.fromCharCode(event.which).toLowerCase();
+  }
+  
+  $(document).bind("keydown", function(event) {
+    keydown[keyName(event)] = true;
+  });
+  
+  $(document).bind("keyup", function(event) {
+    keydown[keyName(event)] = false;
+  });
+});
+</script>
+<!–[if IE]>
+<script src=”http://html5shiv.googlecode.com/svn/trunk/html5.js”></script>
+<![endif]–>
+<style type="text/css">
+*{margin:0;padding: 0;}
+body{text-align:center}
+canvas{border-bottom: 1px solid #000;margin:10px auto}	
+div{width:800px;margin:100px auto 0;text-align:left}
+</style>
+</head>
+<body>
+  <canvas width="800" height="300" id="board">
+	请使用Chrome、FireFox等高端浏览器
+  </canvas>
+   <div>
+  <h3>游戏说明</h3>
+  <p>向上键：跳跃</p>
+  <p>向下键：下蹲</p>
+  <p>画面停止表示游戏结束，请按F5重新游戏</p>
+  <p>持续改进中……</p>
+   </div>
+  <script text="text/javascript">
+  var FPS=100;
+  var canvas=document.getElementById("board").getContext("2d");
+  var textX=1,textY=0;
+  var diectX=1,diectY=1;
+  var speed=2.5;
+  var canvasWidth=800,canvasHeight=300;
+  var time=0;
+  var barriers=[];
+  var init=setInterval(function(){
+  	update();
+  	draw();
+  },1000/FPS);
+  var player={
+    height:29,
+    width:20,
+    x:15,
+    y:canvasHeight-29,
+    jumpHeight:80,
+    startTime:0,
+    status:"normal",
+    draw:function(){
+      var pbody=new Image();
+      var dx=this.x;
+      var dy=this.y;
+      var pw=this.width;
+      var ph=this.height;
+      var sx,sy=0;
+      if(this.status=="normal"){
+        sx=parseInt(time/50%5)*20;
+       }else if(this.status=="jump"){
+        sx=80;
+       }else if(this.status=="roll"){
+        var rtime=time-this.startTime;
+        sx=parseInt(rtime/40%5)*20;
+        sy=29;
+       }
+       pbody.onload=function(){
+        canvas.drawImage(pbody,sx,sy,pw,ph,dx,dy,pw,ph);  
+       };
+       pbody.src="player1.png";
+    },
+    jump:function(time){
+      if(this.status=="jump"){
+        this.up();
+        var moveTime=200;
+        var g=2*this.jumpHeight/(moveTime^2);
+        var t=time-this.startTime;
+        if(t<=moveTime){
+          this.y=canvasHeight-29-0.5*g*t^2;
+        }else if(t>moveTime && t<=2*moveTime){
+          this.y=canvasHeight-29-this.jumpHeight+0.5*g*(t-moveTime)^2;
+        }else if(t>2*moveTime){
+          this.y=canvasHeight-29;
+          this.status="normal";
+        }
+      }
+    },
+    roll:function(time){
+      if(this.status=="roll"){
+        var moveTime=600;
+        var t=time-this.startTime;
+        if(t<=moveTime){
+          this.down();
+        }else if(t>moveTime){
+          this.up();
+          this.status="normal";  
+        }
+       this.y=canvasHeight-this.height;
+      }
+    },
+    up:function(){
+      this.height=29;
+      this.width=20;
+    },
+    down:function(){
+      this.height=15;
+      this.width=20;
+    }
+  };
+  // draw
+  function draw () {
+  	canvas.clearRect(0,0,canvasWidth,canvasHeight);
+    player.draw();
+  	barriers.forEach(function(barrier){
+      barrier.draw();
+    });
+    canvas.fillText("Distance:"+parseInt(FPS*time/1000),700,20);
+  }
+  // update
+  function update () {
+    time+=1000/FPS;
+    if(keydown.up && player.status!="jump"){
+      player.status="jump";
+      player.startTime=time;
+    }else if(keydown.down && player.status!="roll"){
+      player.status="roll";
+      player.startTime=time;
+    }
+    barriers.forEach(function(barrier,index){
+      barrier.update();
+    });
+    if(barriers.length<40){
+      barriers.push(Barrier());
+    }//增加新的障碍物
+    barriers=barriers.filter(function(barrier){
+      return barrier.active;
+    });//移除障碍物
+    player.jump(time);
+    player.roll(time);
+    collision();
+  }
+
+  function Barrier(B){
+    B = B || {};
+
+    B.width=10;
+    B.height=10;
+
+    B.color="#000";
+    B.speed=speed;
+    B.active=true;//障碍物的激活状态
+
+    B.x=setXY(B).x;
+    B.y=setXY(B).y;
+
+    B.draw=function(){
+      canvas.fillStyle=this.color;
+      canvas.fillRect(this.x,this.y,this.width,this.height);
+    };
+
+    B.update=function(){
+      B.x-=B.speed;
+      B.active=B.active && B.isPass();
+    };
+
+    B.isPass=function(){
+      return B.x>0;
+    };
+
+    return B;
+  }
+  //碰撞检测
+  function collision(){
+    var first=barriers[0];
+    var xMin=player.x;
+    var xMax=player.x+player.width;
+    var yMin=player.y;
+    var yMax=player.y+player.height;
+    if(((first.x>xMin && first.x<xMax) && (first.y+6>yMin && first.y<yMax)) || ((first.x+first.width>xMin && first.x+first.width<xMax) && (first.y>yMin && first.y<yMax))){
+      clearInterval(init);
+    }
+  }
+  //设置障碍物的坐标
+  function setXY(B){
+    var len=barriers.length;
+    var top=canvasHeight-B.height-player.height+5;
+    var bottom=canvasHeight-B.height;
+    var x=400;
+    var y=Math.random()<0.5?top:bottom;
+    if(len>0){
+      var last=barriers[len-1];
+      if(last.y==bottom && Math.random()>0.8){
+        x=last.x+last.width+parseInt(Math.random()*(40-25)+10);
+        y=bottom;
+      }else{
+        x=last.x+last.width+parseInt(Math.random()*(150-80)+80);
+      }
+    }
+    return {x:x,y:y};
+  }
+  </script>
+</body>
+</html>
