@@ -1,3 +1,3 @@
-Line Runner
+<h1>Line Runner<h1>
 
-One HTML5 game. 
+<p>One HTML5 game.</p> 
